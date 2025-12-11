@@ -1,0 +1,7 @@
+{
+  "name": "Copy of SecurePTT - Low Latency Walkie Talkie",
+  "description": "A secure, low-latency Push-to-Talk application featuring real-time half-duplex communication and an AI-powered voice assistant channel.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
