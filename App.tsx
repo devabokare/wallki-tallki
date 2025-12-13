@@ -11,7 +11,7 @@ import SettingsModal from './components/SettingsModal';
 import ManageUsersModal from './components/ManageUsersModal';
 import { GeminiService } from './services/geminiService';
 
-// Mock Data
+// --- FALLBACK DATA (Offline Mode) ---
 const INITIAL_DEPARTMENTS: Department[] = [
   { id: 'dept-1', name: 'COMMAND H.Q.' },
   { id: 'dept-2', name: 'FIELD OPS' },
@@ -42,10 +42,11 @@ export default function App() {
   const [companyName, setCompanyName] = useState(() => localStorage.getItem('companyName') || "VANGUARD CORP");
   const [companyLogo, setCompanyLogo] = useState<string | null>(() => localStorage.getItem('companyLogo'));
 
-  const [departments, setDepartments] = useState<Department[]>(INITIAL_DEPARTMENTS);
-  const [channels, setChannels] = useState<Channel[]>(INITIAL_CHANNELS);
-  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
-  const [activeChannelId, setActiveChannelId] = useState<string>(INITIAL_CHANNELS[0].id);
+  // State now defaults to empty arrays, populated by API or Fallback
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [activeChannelId, setActiveChannelId] = useState<string>('');
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -55,8 +56,8 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
   const [pttState, setPttState] = useState<PTTState>(PTTState.IDLE);
-  const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.CONNECTED);
-  const [lastLog, setLastLog] = useState<string>("System Ready. Standing by.");
+  const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.CONNECTING);
+  const [lastLog, setLastLog] = useState<string>("Initializing System...");
   const [transcription, setTranscription] = useState<string>("");
 
   // PWA Install Prompt State
@@ -80,6 +81,43 @@ export default function App() {
   useEffect(() => {
     pttStateRef.current = pttState;
   }, [pttState]);
+
+  // --- API INITIALIZATION WITH FALLBACK ---
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLastLog("Fetching Unit Data...");
+        // Attempt to fetch from backend
+        const res = await fetch('/api/init');
+        if (!res.ok) throw new Error('Failed to fetch data');
+        const data = await res.json();
+        
+        setDepartments(data.departments);
+        setChannels(data.channels);
+        setUsers(data.users);
+        
+        if (data.channels.length > 0) {
+          setActiveChannelId(data.channels[0].id);
+        }
+
+        setConnectionState(ConnectionState.CONNECTED);
+        setLastLog("System Ready. Connected to HQ.");
+      } catch (error) {
+        console.warn("Backend API unreachable. Switching to Offline Mode.", error);
+        
+        // Fallback to local data
+        setDepartments(INITIAL_DEPARTMENTS);
+        setChannels(INITIAL_CHANNELS);
+        setUsers(INITIAL_USERS);
+        setActiveChannelId(INITIAL_CHANNELS[0].id);
+        
+        setConnectionState(ConnectionState.CONNECTED);
+        setLastLog("Offline Mode: Local Systems Active.");
+      }
+    };
+
+    fetchData();
+  }, []);
 
   // Capture PWA Install Prompt
   useEffect(() => {
@@ -236,7 +274,7 @@ export default function App() {
     }
   };
 
-  const handleCreateChannel = (name: string, isSecure: boolean, departmentId: string) => {
+  const handleCreateChannel = async (name: string, isSecure: boolean, departmentId: string) => {
     const newChannel: Channel = {
       id: `ch-${Date.now()}`,
       name: name,
@@ -245,22 +283,45 @@ export default function App() {
       isSecure: isSecure,
       departmentId: departmentId
     };
-    
+
+    // Optimistically update UI, try backend in background
     setChannels(prev => [...prev, newChannel]);
     setActiveChannelId(newChannel.id);
     setLastLog(`New Frequency Assigned: ${name}`);
+
+    try {
+      await fetch('/api/channels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newChannel)
+      });
+    } catch (e) {
+      console.warn("Backend update failed, running in offline mode");
+    }
   };
 
-  const handleCreateDepartment = (name: string) => {
+  const handleCreateDepartment = async (name: string) => {
     const newDept: Department = {
       id: `dept-${Date.now()}`,
       name: name.toUpperCase()
     };
+    
+    // Optimistic update
     setDepartments(prev => [...prev, newDept]);
     setLastLog(`Department Created: ${newDept.name}`);
+
+    try {
+      await fetch('/api/departments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newDept)
+      });
+    } catch (e) {
+       console.warn("Backend update failed, running in offline mode");
+    }
   };
 
-  const handleAddUser = (name: string, channelId: string) => {
+  const handleAddUser = async (name: string, channelId: string) => {
     const newUser: User = {
       id: `u-${Date.now()}`,
       name: name,
@@ -268,13 +329,32 @@ export default function App() {
       isTalking: false,
       channelId: channelId
     };
+
+    // Optimistic update
     setUsers(prev => [...prev, newUser]);
     setLastLog(`User Authorized: ${name}`);
+
+    try {
+      await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newUser)
+      });
+    } catch (e) {
+       console.warn("Backend update failed, running in offline mode");
+    }
   };
 
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
+    // Optimistic update
     setUsers(prev => prev.filter(u => u.id !== userId));
     setLastLog(`User Access Revoked: ID ${userId.slice(-4)}`);
+
+    try {
+      await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+    } catch (e) {
+       console.warn("Backend update failed, running in offline mode");
+    }
   };
 
   const handleSettingsSave = (name: string, logo: string | null) => {
@@ -345,8 +425,19 @@ export default function App() {
     }
   };
 
-  const activeChannel = channels.find(c => c.id === activeChannelId)!;
-  const activeDept = departments.find(d => d.id === activeChannel.departmentId);
+  // Safe fallback if data hasn't loaded
+  const activeChannel = channels.find(c => c.id === activeChannelId) || channels[0];
+  const activeDept = activeChannel ? departments.find(d => d.id === activeChannel.departmentId) : undefined;
+
+  // Show Loading only if no data AND no active channel (initial mount before effect)
+  if (!activeChannel) {
+    return (
+      <div className="flex h-screen w-screen bg-ptt-dark items-center justify-center text-white flex-col gap-4">
+        <div className="w-12 h-12 border-4 border-ptt-accent border-t-transparent rounded-full animate-spin"></div>
+        <div className="text-sm font-mono tracking-widest animate-pulse">ESTABLISHING SECURE CONNECTION...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-screen bg-ptt-dark overflow-hidden font-sans text-white">
@@ -379,7 +470,7 @@ export default function App() {
 
           <div className="flex flex-col items-center md:items-start">
              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500 font-bold uppercase">{companyName} // {activeDept?.name}</span>
+                <span className="text-xs text-gray-500 font-bold uppercase">{companyName} // {activeDept?.name || 'UNASSIGNED'}</span>
              </div>
              <h1 className="text-lg font-bold tracking-widest uppercase flex items-center gap-2">
                 {activeChannel.name}

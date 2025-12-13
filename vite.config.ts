@@ -9,6 +9,13 @@ export default defineConfig({
     chunkSizeWarningLimit: 1600,
   },
   server: {
-    port: 3000,
+    port: 5173, // Standard Vite port
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      }
+    }
   }
 });
