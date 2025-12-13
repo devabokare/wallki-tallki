@@ -28,9 +28,11 @@ export class GeminiService {
       speechConfig: {
         voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Fenrir' } },
       },
-      systemInstruction: 'You are a professional tactical communications officer. Keep responses brief, clear, and to the point. Use radio protocol where appropriate (e.g. "Copy that", "Over").',
-      inputAudioTranscription: { model: "gemini-2.5-flash-native-audio-preview-09-2025" },
-      outputAudioTranscription: { model: "gemini-2.5-flash-native-audio-preview-09-2025" }
+      // Correct format for systemInstruction is Content object or string. Using object for strict compliance.
+      systemInstruction: { parts: [{ text: 'You are a professional tactical communications officer. Keep responses brief, clear, and to the point. Use radio protocol where appropriate (e.g. "Copy that", "Over").' }] },
+      // Enable transcription with empty objects. Do not specify model here.
+      inputAudioTranscription: {}, 
+      outputAudioTranscription: {}
     };
 
     try {
@@ -89,13 +91,12 @@ export class GeminiService {
 
   disconnect() {
     if (this.session) {
-      // session.close() is not always available on the interface depending on version, 
-      // but usually we just let the object GC or look for a close method. 
-      // The current SDK pattern mainly relies on the server closing or simple abandonment if no close method.
-      // However, usually there is no explicit close method exposed on the promise result in all versions.
-      // We will assume simply stopping sending is enough for this demo, or if close exists:
-      if (typeof this.session.close === 'function') {
-        this.session.close();
+      try {
+        if (typeof this.session.close === 'function') {
+          this.session.close();
+        }
+      } catch (e) {
+        console.warn("Error closing session:", e);
       }
       this.session = null;
     }

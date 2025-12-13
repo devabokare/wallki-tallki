@@ -4,12 +4,18 @@ export enum ChannelType {
   AI_ASSISTANT = 'AI_ASSISTANT'
 }
 
+export interface Department {
+  id: string;
+  name: string;
+}
+
 export interface Channel {
   id: string;
   name: string;
   type: ChannelType;
   members: number;
   isSecure: boolean;
+  departmentId: string;
 }
 
 export enum ConnectionState {

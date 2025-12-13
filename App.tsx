@@ -1,26 +1,55 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Menu, Wifi, WifiOff, Users, Settings } from 'lucide-react';
-import { Channel, ChannelType, PTTState, ConnectionState } from './types';
+import { Menu, Wifi, WifiOff, Users, Settings, UserPlus, Building } from 'lucide-react';
+import { Channel, ChannelType, PTTState, ConnectionState, Department } from './types';
 import ChannelList from './components/ChannelList';
 import PTTButton from './components/PTTButton';
 import Visualizer from './components/Visualizer';
+import InviteModal from './components/InviteModal';
+import CreateChannelModal from './components/CreateChannelModal';
+import CreateDepartmentModal from './components/CreateDepartmentModal';
+import SettingsModal from './components/SettingsModal';
 import { GeminiService } from './services/geminiService';
 
 // Mock Data
-const MOCK_CHANNELS: Channel[] = [
-  { id: 'ch-1', name: 'Tactical Ops', type: ChannelType.TEAM, members: 12, isSecure: true },
-  { id: 'ch-2', name: 'Security Detail', type: ChannelType.TEAM, members: 4, isSecure: true },
-  { id: 'ch-3', name: 'General Comms', type: ChannelType.TEAM, members: 28, isSecure: false },
-  { id: 'ch-ai', name: 'AI Command', type: ChannelType.AI_ASSISTANT, members: 1, isSecure: true },
+const INITIAL_DEPARTMENTS: Department[] = [
+  { id: 'dept-1', name: 'COMMAND H.Q.' },
+  { id: 'dept-2', name: 'FIELD OPS' },
+  { id: 'dept-3', name: 'SUPPORT' }
+];
+
+const INITIAL_CHANNELS: Channel[] = [
+  { id: 'ch-ai', name: 'AI TACTICAL', type: ChannelType.AI_ASSISTANT, members: 1, isSecure: true, departmentId: 'dept-1' },
+  { id: 'ch-1', name: 'ALPHA SQUAD', type: ChannelType.TEAM, members: 12, isSecure: true, departmentId: 'dept-2' },
+  { id: 'ch-2', name: 'BRAVO SQUAD', type: ChannelType.TEAM, members: 8, isSecure: true, departmentId: 'dept-2' },
+  { id: 'ch-3', name: 'LOGISTICS', type: ChannelType.TEAM, members: 4, isSecure: false, departmentId: 'dept-3' },
+  { id: 'ch-4', name: 'MAINTENANCE', type: ChannelType.TEAM, members: 6, isSecure: false, departmentId: 'dept-3' },
 ];
 
 export default function App() {
-  const [activeChannelId, setActiveChannelId] = useState<string>(MOCK_CHANNELS[0].id);
+  // Initialize from LocalStorage if available
+  const [companyName, setCompanyName] = useState(() => localStorage.getItem('companyName') || "VANGUARD CORP");
+  const [companyLogo, setCompanyLogo] = useState<string | null>(() => localStorage.getItem('companyLogo'));
+
+  const [departments, setDepartments] = useState<Department[]>(INITIAL_DEPARTMENTS);
+  const [channels, setChannels] = useState<Channel[]>(INITIAL_CHANNELS);
+  const [activeChannelId, setActiveChannelId] = useState<string>(INITIAL_CHANNELS[0].id);
+  
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false);
+  const [isCreateDepartmentOpen, setIsCreateDepartmentOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  
   const [pttState, setPttState] = useState<PTTState>(PTTState.IDLE);
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.CONNECTED);
   const [lastLog, setLastLog] = useState<string>("System Ready. Standing by.");
   const [transcription, setTranscription] = useState<string>("");
+
+  // PWA Install Prompt State
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+
+  // Refs for state that needs to be accessed in callbacks (stale closure prevention)
+  const pttStateRef = useRef<PTTState>(PTTState.IDLE);
 
   // Audio & AI Refs
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -31,7 +60,38 @@ export default function App() {
   
   // Audio Output Refs (for incoming audio playback)
   const nextStartTimeRef = useRef<number>(0);
+  const receivingTimeoutRef = useRef<number | null>(null);
   
+  // Sync Ref with State
+  useEffect(() => {
+    pttStateRef.current = pttState;
+  }, [pttState]);
+
+  // Capture PWA Install Prompt
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallApp = () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    installPrompt.userChoice.then((choiceResult: any) => {
+      if (choiceResult.outcome === 'accepted') {
+        console.log('User accepted the install prompt');
+      }
+      setInstallPrompt(null);
+    });
+  };
+
   // Initialize Audio Context on first interaction
   const initAudio = async () => {
     if (!audioContextRef.current) {
@@ -53,25 +113,39 @@ export default function App() {
     }
   };
 
-  // Channel Switching Logic
-  const handleChannelSelect = async (id: string) => {
-    // If we were connected to AI, disconnect
-    const currentChannel = MOCK_CHANNELS.find(c => c.id === activeChannelId);
-    if (currentChannel?.type === ChannelType.AI_ASSISTANT) {
-       disconnectGemini();
+  // Audio Playback Queue Logic
+  const playAudioBuffer = useCallback((buffer: AudioBuffer) => {
+    if (!audioContextRef.current) return;
+    const ctx = audioContextRef.current;
+    
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    
+    const currentTime = ctx.currentTime;
+    
+    if (nextStartTimeRef.current < currentTime) {
+        nextStartTimeRef.current = currentTime + 0.02; // 20ms safety buffer
     }
     
-    setActiveChannelId(id);
-    setIsMobileMenuOpen(false);
-    
-    const newChannel = MOCK_CHANNELS.find(c => c.id === id);
-    setLastLog(`Switched to channel: ${newChannel?.name}`);
+    source.start(nextStartTimeRef.current);
+    nextStartTimeRef.current += buffer.duration;
 
-    // If switching TO AI, connect immediately
-    if (newChannel?.type === ChannelType.AI_ASSISTANT) {
-      await connectGemini();
+    if (receivingTimeoutRef.current) {
+        window.clearTimeout(receivingTimeoutRef.current);
+        receivingTimeoutRef.current = null;
     }
-  };
+
+    if (pttStateRef.current !== PTTState.TRANSMITTING) {
+        setPttState(PTTState.RECEIVING);
+        const timeUntilFinish = (nextStartTimeRef.current - ctx.currentTime) * 1000;
+        receivingTimeoutRef.current = window.setTimeout(() => {
+            if (pttStateRef.current === PTTState.RECEIVING) {
+                setPttState(PTTState.IDLE);
+            }
+        }, timeUntilFinish);
+    }
+  }, []); 
 
   // Gemini Connection Handlers
   const connectGemini = async () => {
@@ -97,20 +171,11 @@ export default function App() {
         setLastLog("AI Command Uplink: SECURE");
       },
       onAudioData: (audioBuffer) => {
-        // Enforcing Half-Duplex: Only play if we are NOT transmitting
-        // Note: In a real PTT app, we might also lock PTT if receiving.
-        // For smoother AI interaction, we allow full duplex technically but visually show RECEIVING.
-        
-        if (pttState === PTTState.TRANSMITTING) return; 
-
+        if (pttStateRef.current === PTTState.TRANSMITTING) {
+            console.log("Ignored incoming audio while transmitting");
+            return;
+        }
         playAudioBuffer(audioBuffer);
-        setPttState(PTTState.RECEIVING);
-        
-        // Reset to IDLE after audio finishes (rough estimation)
-        const durationMs = audioBuffer.duration * 1000;
-        setTimeout(() => {
-          setPttState(prev => prev === PTTState.RECEIVING ? PTTState.IDLE : prev);
-        }, durationMs);
       },
       onClose: () => {
         setLastLog("AI Uplink Terminated.");
@@ -130,25 +195,63 @@ export default function App() {
       geminiServiceRef.current.disconnect();
       geminiServiceRef.current = null;
     }
+    nextStartTimeRef.current = 0;
   };
-
-  // Audio Playback Queue Logic
-  const playAudioBuffer = (buffer: AudioBuffer) => {
-    if (!audioContextRef.current) return;
-    const ctx = audioContextRef.current;
-    
-    const source = ctx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(ctx.destination);
-    
-    // Schedule playback
-    const currentTime = ctx.currentTime;
-    if (nextStartTimeRef.current < currentTime) {
-      nextStartTimeRef.current = currentTime;
+  
+  const handleChannelSelect = async (id: string) => {
+    const currentChannel = channels.find(c => c.id === activeChannelId);
+    if (currentChannel?.type === ChannelType.AI_ASSISTANT) {
+       disconnectGemini();
     }
     
-    source.start(nextStartTimeRef.current);
-    nextStartTimeRef.current += buffer.duration;
+    setActiveChannelId(id);
+    setIsMobileMenuOpen(false);
+    
+    const newChannel = channels.find(c => c.id === id);
+    setLastLog(`Channel Switched: ${newChannel?.name}`);
+
+    if (newChannel?.type === ChannelType.AI_ASSISTANT) {
+      await connectGemini();
+    }
+  };
+
+  const handleCreateChannel = (name: string, isSecure: boolean, departmentId: string) => {
+    const newChannel: Channel = {
+      id: `ch-${Date.now()}`,
+      name: name,
+      type: ChannelType.TEAM,
+      members: 1,
+      isSecure: isSecure,
+      departmentId: departmentId
+    };
+    
+    setChannels(prev => [...prev, newChannel]);
+    setActiveChannelId(newChannel.id);
+    setLastLog(`New Frequency Assigned: ${name}`);
+  };
+
+  const handleCreateDepartment = (name: string) => {
+    const newDept: Department = {
+      id: `dept-${Date.now()}`,
+      name: name.toUpperCase()
+    };
+    setDepartments(prev => [...prev, newDept]);
+    setLastLog(`Department Created: ${newDept.name}`);
+  };
+
+  const handleSettingsSave = (name: string, logo: string | null) => {
+    setCompanyName(name);
+    setCompanyLogo(logo);
+    
+    // Persist to LocalStorage
+    localStorage.setItem('companyName', name);
+    if (logo) {
+      localStorage.setItem('companyLogo', logo);
+    } else {
+      localStorage.removeItem('companyLogo');
+    }
+    
+    setLastLog("System Configuration Updated");
   };
 
   // PTT Handlers
@@ -159,13 +262,10 @@ export default function App() {
     setPttState(PTTState.TRANSMITTING);
     setLastLog("Transmitting...");
 
-    const activeCh = MOCK_CHANNELS.find(c => c.id === activeChannelId);
+    const activeCh = channels.find(c => c.id === activeChannelId);
 
-    // If AI Channel, start pumping audio to Gemini
     if (activeCh?.type === ChannelType.AI_ASSISTANT) {
-      // Setup Processor
       const ctx = audioContextRef.current;
-      // Using ScriptProcessor for compatibility and ease of single-file embedding
       const processor = ctx.createScriptProcessor(4096, 1, 1);
       processor.onaudioprocess = (e) => {
         const inputData = e.inputBuffer.getChannelData(0);
@@ -176,27 +276,14 @@ export default function App() {
 
       const source = ctx.createMediaStreamSource(mediaStreamRef.current);
       source.connect(processor);
-      processor.connect(ctx.destination); // Mute locally? Usually destination is speakers. Connect to destination to keep graph alive but maybe gain 0.
-
-      // Store refs to clean up
-      sourceRef.current = source;
-      processorRef.current = processor;
       
-      // Mute local output for the microphone stream to prevent feedback
-      // Actually, ScriptProcessor needs to connect to destination to fire events in some browsers,
-      // but we can create a GainNode(0)
       const mute = ctx.createGain();
       mute.gain.value = 0;
       processor.connect(mute);
       mute.connect(ctx.destination);
-    } else {
-        // Mock Channel Transmission
-        // In a real app, this would send RTP packets via WebSocket/WebRTC
-        // Here we just simulate visual feedback
-        setTimeout(() => {
-            // Simulate random incoming chatter after releasing
-            // Not implemented for simplicity, focusing on AI demo
-        }, 1000);
+
+      sourceRef.current = source;
+      processorRef.current = processor;
     }
   };
 
@@ -204,7 +291,6 @@ export default function App() {
     setPttState(PTTState.IDLE);
     setLastLog("Transmission Ended.");
 
-    // Clean up audio nodes
     if (sourceRef.current) {
       sourceRef.current.disconnect();
       sourceRef.current = null;
@@ -215,16 +301,22 @@ export default function App() {
     }
   };
 
-  const activeChannel = MOCK_CHANNELS.find(c => c.id === activeChannelId)!;
+  const activeChannel = channels.find(c => c.id === activeChannelId)!;
+  const activeDept = departments.find(d => d.id === activeChannel.departmentId);
 
   return (
     <div className="flex h-screen w-screen bg-ptt-dark overflow-hidden font-sans text-white">
       {/* Sidebar Channel List */}
       <ChannelList 
-        channels={MOCK_CHANNELS} 
+        companyName={companyName}
+        companyLogo={companyLogo}
+        departments={departments}
+        channels={channels} 
         activeChannelId={activeChannelId} 
         onSelectChannel={handleChannelSelect}
         isMobileMenuOpen={isMobileMenuOpen}
+        onCreateChannel={() => setIsCreateChannelOpen(true)}
+        onCreateDepartment={() => setIsCreateDepartmentOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -240,20 +332,33 @@ export default function App() {
           </button>
 
           <div className="flex flex-col items-center md:items-start">
+             <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500 font-bold uppercase">{companyName} // {activeDept?.name}</span>
+             </div>
              <h1 className="text-lg font-bold tracking-widest uppercase flex items-center gap-2">
                 {activeChannel.name}
                 {activeChannel.isSecure && <span className="bg-green-900/50 text-green-400 text-[10px] px-1.5 py-0.5 rounded border border-green-800">ENCRYPTED</span>}
              </h1>
-             <div className="flex items-center gap-2 text-xs text-gray-500 font-mono">
-                <span className={`w-2 h-2 rounded-full ${connectionState === ConnectionState.CONNECTED ? 'bg-green-500' : 'bg-red-500'}`} />
-                {connectionState === ConnectionState.CONNECTED ? 'SIGNAL STRONG' : 'NO SIGNAL'}
-                <span className="mx-1">|</span>
-                {activeChannel.members} ACTIVE
-             </div>
           </div>
 
           <div className="flex items-center gap-4">
-            <Settings className="text-gray-500 hover:text-white cursor-pointer" size={20} />
+            <button 
+              onClick={() => setIsInviteOpen(true)}
+              className="text-gray-500 hover:text-white transition-colors"
+              title="Invite People"
+            >
+              <UserPlus size={20} />
+            </button>
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="text-gray-500 hover:text-white transition-colors relative"
+              title="Settings"
+            >
+              <Settings size={20} />
+              {installPrompt && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-ptt-accent rounded-full animate-pulse" />
+              )}
+            </button>
           </div>
         </header>
 
@@ -304,6 +409,36 @@ export default function App() {
 
         </div>
       </div>
+
+      <InviteModal 
+        isOpen={isInviteOpen} 
+        onClose={() => setIsInviteOpen(false)} 
+        channelName={activeChannel.name}
+        isSecure={activeChannel.isSecure}
+      />
+
+      <CreateChannelModal
+        isOpen={isCreateChannelOpen}
+        onClose={() => setIsCreateChannelOpen(false)}
+        onCreate={handleCreateChannel}
+        departments={departments}
+      />
+
+      <CreateDepartmentModal
+        isOpen={isCreateDepartmentOpen}
+        onClose={() => setIsCreateDepartmentOpen(false)}
+        onCreate={handleCreateDepartment}
+      />
+
+      <SettingsModal 
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        currentName={companyName}
+        currentLogo={companyLogo}
+        onSave={handleSettingsSave}
+        installPrompt={installPrompt}
+        onInstall={handleInstallApp}
+      />
 
       {/* Mobile Overlay Backdrop */}
       {isMobileMenuOpen && (
