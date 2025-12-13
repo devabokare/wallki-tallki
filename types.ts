@@ -45,3 +45,24 @@ export interface AudioVisualizerData {
   volume: number;
   history: number[];
 }
+
+export interface Account {
+  id: string;
+  username: string; // This will now store Email or Phone
+  password?: string; // Only used backend side, never sent to client in list
+  callsign: string;
+  role: string;
+  createdAt: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: Account;
+}
+
+export interface AllowedMember {
+  id: string;
+  email?: string;
+  phone?: string;
+  name: string; // Real name associated with the ID
+}

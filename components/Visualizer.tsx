@@ -26,7 +26,7 @@ const Visualizer: React.FC<VisualizerProps> = ({ stream, isActive, color }) => {
     }
 
     const analyser = ctx.createAnalyser();
-    analyser.fftSize = 64;
+    analyser.fftSize = 64; 
     analyserRef.current = analyser;
 
     const source = ctx.createMediaStreamSource(stream);
@@ -48,21 +48,37 @@ const Visualizer: React.FC<VisualizerProps> = ({ stream, isActive, color }) => {
 
       canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const barWidth = (canvas.width / bufferLength) * 2.5;
-      let barHeight;
-      let x = 0;
-
+      const centerX = canvas.width / 2;
+      const barWidth = (centerX / bufferLength) * 1.5;
+      
+      // Draw mirrored from center
       for (let i = 0; i < bufferLength; i++) {
-        barHeight = (dataArray[i] / 255) * canvas.height;
-
+        // Normalize value
+        const value = dataArray[i] / 255;
+        // Apply height scaling
+        const barHeight = value * canvas.height * 0.8;
+        
+        // Dynamic opacity based on height
+        const opacity = 0.5 + (value * 0.5);
         canvasCtx.fillStyle = color;
-        // Rounded caps
+        canvasCtx.globalAlpha = opacity;
+
+        // Right side
+        const xRight = centerX + (i * (barWidth + 1));
+        const y = (canvas.height - barHeight) / 2; // Vertically centered
+        
         canvasCtx.beginPath();
-        canvasCtx.roundRect(x, canvas.height - barHeight, barWidth, barHeight, 4);
+        canvasCtx.roundRect(xRight, y, barWidth, barHeight, 20);
         canvasCtx.fill();
 
-        x += barWidth + 2;
+        // Left side (mirrored)
+        const xLeft = centerX - (i * (barWidth + 1)) - barWidth;
+        canvasCtx.beginPath();
+        canvasCtx.roundRect(xLeft, y, barWidth, barHeight, 20);
+        canvasCtx.fill();
       }
+      
+      canvasCtx.globalAlpha = 1.0;
     };
 
     draw();
@@ -73,7 +89,6 @@ const Visualizer: React.FC<VisualizerProps> = ({ stream, isActive, color }) => {
         sourceRef.current.disconnect();
         sourceRef.current = null;
       }
-      // Note: We don't close the AudioContext here to reuse it, but strict cleanup would close it.
     };
   }, [stream, isActive, color]);
 
@@ -88,8 +103,8 @@ const Visualizer: React.FC<VisualizerProps> = ({ stream, isActive, color }) => {
   return (
     <canvas 
       ref={canvasRef} 
-      width={300} 
-      height={60} 
+      width={600} 
+      height={100} 
       className="w-full h-full"
     />
   );
