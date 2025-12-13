@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Menu, Wifi, WifiOff, Users, Settings, UserPlus, Building } from 'lucide-react';
-import { Channel, ChannelType, PTTState, ConnectionState, Department } from './types';
+import { Channel, ChannelType, PTTState, ConnectionState, Department, User } from './types';
 import ChannelList from './components/ChannelList';
 import PTTButton from './components/PTTButton';
 import Visualizer from './components/Visualizer';
@@ -8,6 +8,7 @@ import InviteModal from './components/InviteModal';
 import CreateChannelModal from './components/CreateChannelModal';
 import CreateDepartmentModal from './components/CreateDepartmentModal';
 import SettingsModal from './components/SettingsModal';
+import ManageUsersModal from './components/ManageUsersModal';
 import { GeminiService } from './services/geminiService';
 
 // Mock Data
@@ -25,6 +26,17 @@ const INITIAL_CHANNELS: Channel[] = [
   { id: 'ch-4', name: 'MAINTENANCE', type: ChannelType.TEAM, members: 6, isSecure: false, departmentId: 'dept-3' },
 ];
 
+const INITIAL_USERS: User[] = [
+  { id: 'u1', name: 'Alpha Lead', isOnline: true, isTalking: false, channelId: 'ch-1' },
+  { id: 'u2', name: 'Operator 2', isOnline: true, isTalking: false, channelId: 'ch-1' },
+  { id: 'u3', name: 'Operator 3', isOnline: true, isTalking: false, channelId: 'ch-1' },
+  { id: 'u6', name: 'Sec Lead', isOnline: true, isTalking: false, channelId: 'ch-2' },
+  { id: 'u7', name: 'Gate 1', isOnline: true, isTalking: false, channelId: 'ch-2' },
+  { id: 'u9', name: 'Dispatch', isOnline: true, isTalking: false, channelId: 'ch-3' },
+  { id: 'u12', name: 'Whse Mgr', isOnline: true, isTalking: false, channelId: 'ch-3' },
+  { id: 'ai-1', name: 'AI Command', isOnline: true, isTalking: false, channelId: 'ch-ai' },
+];
+
 export default function App() {
   // Initialize from LocalStorage if available
   const [companyName, setCompanyName] = useState(() => localStorage.getItem('companyName') || "VANGUARD CORP");
@@ -32,12 +44,14 @@ export default function App() {
 
   const [departments, setDepartments] = useState<Department[]>(INITIAL_DEPARTMENTS);
   const [channels, setChannels] = useState<Channel[]>(INITIAL_CHANNELS);
+  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [activeChannelId, setActiveChannelId] = useState<string>(INITIAL_CHANNELS[0].id);
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false);
   const [isCreateDepartmentOpen, setIsCreateDepartmentOpen] = useState(false);
+  const [isManageUsersOpen, setIsManageUsersOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
   const [pttState, setPttState] = useState<PTTState>(PTTState.IDLE);
@@ -138,6 +152,9 @@ export default function App() {
 
     if (pttStateRef.current !== PTTState.TRANSMITTING) {
         setPttState(PTTState.RECEIVING);
+        // Explicitly check for BUSY state logic if needed, but RECEIVING covers the UI blocking
+        // setPttState(PTTState.BUSY); // Optional: if you want BUSY logic during simple RX
+        
         const timeUntilFinish = (nextStartTimeRef.current - ctx.currentTime) * 1000;
         receivingTimeoutRef.current = window.setTimeout(() => {
             if (pttStateRef.current === PTTState.RECEIVING) {
@@ -175,7 +192,11 @@ export default function App() {
             console.log("Ignored incoming audio while transmitting");
             return;
         }
+        // Force BUSY state logic visual via playAudioBuffer or here
+        setPttState(PTTState.BUSY); // Force BUSY immediately
         playAudioBuffer(audioBuffer);
+        
+        // Reset from BUSY to IDLE handled in playAudioBuffer timeout
       },
       onClose: () => {
         setLastLog("AI Uplink Terminated.");
@@ -239,6 +260,23 @@ export default function App() {
     setLastLog(`Department Created: ${newDept.name}`);
   };
 
+  const handleAddUser = (name: string, channelId: string) => {
+    const newUser: User = {
+      id: `u-${Date.now()}`,
+      name: name,
+      isOnline: false, // Default offline until they 'login' (mock)
+      isTalking: false,
+      channelId: channelId
+    };
+    setUsers(prev => [...prev, newUser]);
+    setLastLog(`User Authorized: ${name}`);
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    setUsers(prev => prev.filter(u => u.id !== userId));
+    setLastLog(`User Access Revoked: ID ${userId.slice(-4)}`);
+  };
+
   const handleSettingsSave = (name: string, logo: string | null) => {
     setCompanyName(name);
     setCompanyLogo(logo);
@@ -256,6 +294,12 @@ export default function App() {
 
   // PTT Handlers
   const startTransmission = async () => {
+    // Strict Half-Duplex check
+    if (pttStateRef.current !== PTTState.IDLE) {
+        setLastLog("Error: Channel Busy. Wait to transmit.");
+        return;
+    }
+
     await initAudio();
     if (!audioContextRef.current || !mediaStreamRef.current) return;
 
@@ -311,12 +355,14 @@ export default function App() {
         companyName={companyName}
         companyLogo={companyLogo}
         departments={departments}
-        channels={channels} 
+        channels={channels}
+        users={users} 
         activeChannelId={activeChannelId} 
         onSelectChannel={handleChannelSelect}
         isMobileMenuOpen={isMobileMenuOpen}
         onCreateChannel={() => setIsCreateChannelOpen(true)}
         onCreateDepartment={() => setIsCreateDepartmentOpen(true)}
+        onManageUsers={() => setIsManageUsersOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -369,8 +415,8 @@ export default function App() {
           <div className="absolute top-8 left-0 right-0 h-24 px-8 opacity-50">
              <Visualizer 
                 stream={mediaStreamRef.current} 
-                isActive={pttState === PTTState.TRANSMITTING || pttState === PTTState.RECEIVING} 
-                color={pttState === PTTState.TRANSMITTING ? '#ef4444' : '#22c55e'}
+                isActive={pttState === PTTState.TRANSMITTING || pttState === PTTState.RECEIVING || pttState === PTTState.BUSY} 
+                color={(pttState === PTTState.RECEIVING || pttState === PTTState.BUSY) ? '#f59e0b' : '#ef4444'}
              />
           </div>
 
@@ -428,6 +474,15 @@ export default function App() {
         isOpen={isCreateDepartmentOpen}
         onClose={() => setIsCreateDepartmentOpen(false)}
         onCreate={handleCreateDepartment}
+      />
+
+      <ManageUsersModal 
+        isOpen={isManageUsersOpen}
+        onClose={() => setIsManageUsersOpen(false)}
+        users={users}
+        channels={channels}
+        onAddUser={handleAddUser}
+        onDeleteUser={handleDeleteUser}
       />
 
       <SettingsModal 

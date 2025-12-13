@@ -1,54 +1,33 @@
 import React from 'react';
 import { Channel, ChannelType, User, Department } from '../types';
-import { Lock, Radio, Bot, Users as UsersIcon, Circle, Mic, Plus, Building2, ChevronDown, Signal, SignalLow, SignalZero } from 'lucide-react';
+import { Lock, Radio, Bot, Users as UsersIcon, Mic, Plus, Building2, ChevronDown, Signal, SignalZero, UserCog } from 'lucide-react';
 
 interface ChannelListProps {
   companyName: string;
   companyLogo: string | null;
   departments: Department[];
   channels: Channel[];
+  users: User[];
   activeChannelId: string;
   onSelectChannel: (id: string) => void;
   isMobileMenuOpen: boolean;
   onCreateChannel: () => void;
   onCreateDepartment: () => void;
+  onManageUsers: () => void;
 }
-
-// Mock users data for demonstration
-const MOCK_CHANNEL_USERS: Record<string, User[]> = {
-  'ch-1': [
-    { id: 'u1', name: 'Alpha Lead', isOnline: true, isTalking: false },
-    { id: 'u2', name: 'Operator 2', isOnline: true, isTalking: true }, // Set one to talking for demo
-    { id: 'u3', name: 'Operator 3', isOnline: true, isTalking: false },
-    { id: 'u4', name: 'Scout 1', isOnline: false, isTalking: false },
-    { id: 'u5', name: 'Scout 2', isOnline: false, isTalking: false },
-  ],
-  'ch-2': [
-    { id: 'u6', name: 'Sec Lead', isOnline: true, isTalking: false },
-    { id: 'u7', name: 'Gate 1', isOnline: true, isTalking: false },
-    { id: 'u8', name: 'Rover', isOnline: true, isTalking: false },
-  ],
-  'ch-3': [
-    { id: 'u9', name: 'Dispatch', isOnline: true, isTalking: false },
-    { id: 'u10', name: 'Driver 1', isOnline: false, isTalking: false },
-    { id: 'u11', name: 'Driver 2', isOnline: false, isTalking: false },
-    { id: 'u12', name: 'Whse Mgr', isOnline: true, isTalking: false },
-  ],
-  'ch-ai': [
-    { id: 'ai-1', name: 'AI Command', isOnline: true, isTalking: false },
-  ]
-};
 
 const ChannelList: React.FC<ChannelListProps> = ({ 
   companyName,
   companyLogo,
   departments,
-  channels, 
+  channels,
+  users,
   activeChannelId, 
   onSelectChannel,
   isMobileMenuOpen,
   onCreateChannel,
-  onCreateDepartment
+  onCreateDepartment,
+  onManageUsers
 }) => {
   return (
     <div className={`
@@ -75,18 +54,27 @@ const ChannelList: React.FC<ChannelListProps> = ({
       </div>
 
       {/* Global Actions */}
-      <div className="px-4 py-3 flex gap-2 border-b border-gray-800/50">
+      <div className="px-2 py-3 flex gap-1 border-b border-gray-800/50">
         <button 
           onClick={onCreateDepartment}
-          className="flex-1 flex items-center justify-center gap-2 text-[10px] font-bold uppercase bg-gray-800 hover:bg-gray-700 text-gray-300 py-2 rounded transition-colors"
+          className="flex-1 flex flex-col items-center justify-center gap-1 text-[9px] font-bold uppercase bg-gray-800 hover:bg-gray-700 text-gray-300 py-2 rounded transition-colors"
+          title="Add Department"
         >
-          <Plus size={12} /> Add Dept
+          <Plus size={14} /> Dept
         </button>
         <button 
           onClick={onCreateChannel}
-          className="flex-1 flex items-center justify-center gap-2 text-[10px] font-bold uppercase bg-ptt-accent hover:bg-blue-600 text-white py-2 rounded transition-colors"
+          className="flex-1 flex flex-col items-center justify-center gap-1 text-[9px] font-bold uppercase bg-gray-800 hover:bg-gray-700 text-gray-300 py-2 rounded transition-colors"
+          title="Add Frequency"
         >
-          <Radio size={12} /> Add Freq
+          <Radio size={14} /> Freq
+        </button>
+        <button 
+          onClick={onManageUsers}
+          className="flex-1 flex flex-col items-center justify-center gap-1 text-[9px] font-bold uppercase bg-ptt-accent hover:bg-blue-600 text-white py-2 rounded transition-colors"
+          title="Manage Users"
+        >
+          <UserCog size={14} /> Users
         </button>
       </div>
 
@@ -109,7 +97,7 @@ const ChannelList: React.FC<ChannelListProps> = ({
               <div className="space-y-1">
                 {deptChannels.map(channel => {
                   const isActive = activeChannelId === channel.id;
-                  const users = MOCK_CHANNEL_USERS[channel.id] || [];
+                  const channelUsers = users.filter(u => u.channelId === channel.id);
                   
                   return (
                     <div key={channel.id} className="flex flex-col gap-1">
@@ -147,37 +135,41 @@ const ChannelList: React.FC<ChannelListProps> = ({
                       {/* Active Channel User List */}
                       {isActive && (
                         <div className="ml-8 pr-2 space-y-0.5 py-1 animate-in slide-in-from-left-2 duration-200 border-l border-gray-800 pl-2">
-                          {users.map(user => (
-                            <div key={user.id} className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-white/5 transition-colors group/user">
-                              <div className="flex items-center gap-2 overflow-hidden">
-                                {/* Status Dot */}
-                                <div className={`w-2 h-2 rounded-full ${user.isOnline ? 'bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]' : 'bg-gray-700 border border-gray-600'} shrink-0 transition-colors`} />
-                                
-                                {/* Name */}
-                                <span className={`text-[10px] font-mono truncate transition-colors ${user.isOnline ? 'text-gray-300 group-hover/user:text-white' : 'text-gray-600'}`}>
-                                  {user.name}
-                                </span>
-                              </div>
+                          {channelUsers.length > 0 ? (
+                            channelUsers.map(user => (
+                              <div key={user.id} className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-white/5 transition-colors group/user">
+                                <div className="flex items-center gap-2 overflow-hidden">
+                                  {/* Status Dot */}
+                                  <div className={`w-2 h-2 rounded-full ${user.isOnline ? 'bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]' : 'bg-gray-700 border border-gray-600'} shrink-0 transition-colors`} />
+                                  
+                                  {/* Name */}
+                                  <span className={`text-[10px] font-mono truncate transition-colors ${user.isOnline ? 'text-gray-300 group-hover/user:text-white' : 'text-gray-600'}`}>
+                                    {user.name}
+                                  </span>
+                                </div>
 
-                              {/* Status Indicators */}
-                              <div className="flex items-center gap-2">
-                                {user.isTalking ? (
-                                   <div className="flex items-center gap-1 text-[9px] font-bold text-red-500 animate-pulse uppercase tracking-wider">
-                                     <Mic size={10} className="fill-current" />
-                                     <span>TX</span>
-                                   </div>
-                                ) : user.isOnline ? (
-                                  <div className="flex items-center gap-1" title="Signal Good">
-                                     <Signal size={10} className="text-green-500/40" />
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-1" title="Offline">
-                                     <SignalZero size={10} className="text-gray-700" />
-                                  </div>
-                                )}
+                                {/* Status Indicators */}
+                                <div className="flex items-center gap-2">
+                                  {user.isTalking ? (
+                                    <div className="flex items-center gap-1 text-[9px] font-bold text-red-500 animate-pulse uppercase tracking-wider">
+                                      <Mic size={10} className="fill-current" />
+                                      <span>TX</span>
+                                    </div>
+                                  ) : user.isOnline ? (
+                                    <div className="flex items-center gap-1" title="Signal Good">
+                                      <Signal size={10} className="text-green-500/40" />
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-1" title="Offline">
+                                      <SignalZero size={10} className="text-gray-700" />
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))
+                          ) : (
+                            <div className="text-[10px] text-gray-600 px-2 py-1 italic">No active units</div>
+                          )}
                         </div>
                       )}
                     </div>

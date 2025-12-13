@@ -1,3 +1,4 @@
+
 export enum ChannelType {
   TEAM = 'TEAM',
   PRIVATE = 'PRIVATE',
@@ -37,6 +38,7 @@ export interface User {
   name: string;
   isOnline: boolean;
   isTalking: boolean;
+  channelId: string; // Added to link user to channel
 }
 
 export interface AudioVisualizerData {
