@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Settings, Upload, Save, Image as ImageIcon, Trash2, Download, Smartphone, Monitor } from 'lucide-react';
+import { X, Settings, Upload, Save, Image as ImageIcon, Trash2, Download, Smartphone, Monitor, Activity, Cpu } from 'lucide-react';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentName: string;
   currentLogo: string | null;
-  onSave: (name: string, logo: string | null) => void;
+  currentCodec: string;
+  currentBitrate: string;
+  onSave: (name: string, logo: string | null, codec: string, bitrate: string) => void;
   installPrompt?: any;
   onInstall?: () => void;
 }
@@ -16,12 +18,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose, 
   currentName, 
   currentLogo, 
+  currentCodec = 'opus',
+  currentBitrate = '32000',
   onSave, 
   installPrompt,
   onInstall 
 }) => {
   const [name, setName] = useState(currentName);
   const [logo, setLogo] = useState<string | null>(currentLogo);
+  const [codec, setCodec] = useState(currentCodec);
+  const [bitrate, setBitrate] = useState(currentBitrate);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Reset state when opening
@@ -29,8 +35,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     if (isOpen) {
       setName(currentName);
       setLogo(currentLogo);
+      setCodec(currentCodec);
+      setBitrate(currentBitrate);
     }
-  }, [isOpen, currentName, currentLogo]);
+  }, [isOpen, currentName, currentLogo, currentCodec, currentBitrate]);
 
   if (!isOpen) return null;
 
@@ -47,7 +55,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(name, logo);
+    onSave(name, logo, codec, bitrate);
     onClose();
   };
 
@@ -156,6 +164,49 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* Audio Configuration */}
+            <div className="bg-gray-900/50 border border-gray-700 rounded p-4 space-y-4">
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                    <Activity size={14} /> Audio Transmission Profile
+                </h4>
+                
+                <div className="grid grid-cols-2 gap-4">
+                    {/* Codec Selection */}
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Codec</label>
+                        <select 
+                            value={codec} 
+                            onChange={(e) => setCodec(e.target.value)}
+                            className="w-full bg-gray-800 border border-gray-700 text-white text-xs rounded px-3 py-2 focus:outline-none focus:border-ptt-accent font-mono"
+                        >
+                            <option value="opus">Opus (Recommended)</option>
+                            <option value="aac">AAC-LC</option>
+                            <option value="pcm">G.711 PCM (Uncompressed)</option>
+                        </select>
+                    </div>
+
+                    {/* Bitrate Selection */}
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Bitrate</label>
+                        <select 
+                            value={bitrate} 
+                            onChange={(e) => setBitrate(e.target.value)}
+                            className="w-full bg-gray-800 border border-gray-700 text-white text-xs rounded px-3 py-2 focus:outline-none focus:border-ptt-accent font-mono"
+                        >
+                            <option value="16000">16 kbps (Low Latency)</option>
+                            <option value="32000">32 kbps (Standard)</option>
+                            <option value="64000">64 kbps (High Fidelity)</option>
+                            <option value="128000">128 kbps (Studio)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div className="text-[9px] text-gray-500 font-mono flex items-center gap-1">
+                    <Cpu size={10} />
+                    <span>Fallback to OPUS active if selected codec unavailable.</span>
+                </div>
             </div>
 
             {/* Company Name Input */}

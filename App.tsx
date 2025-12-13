@@ -45,6 +45,10 @@ export default function App() {
   // Initialize from LocalStorage if available
   const [companyName, setCompanyName] = useState(() => localStorage.getItem('companyName') || "ADROIT GROUP");
   const [companyLogo, setCompanyLogo] = useState<string | null>(() => localStorage.getItem('companyLogo'));
+  
+  // Audio Settings State
+  const [audioCodec, setAudioCodec] = useState(() => localStorage.getItem('audioCodec') || 'opus');
+  const [audioBitrate, setAudioBitrate] = useState(() => localStorage.getItem('audioBitrate') || '32000');
 
   // State now defaults to empty arrays, populated by API or Fallback
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -419,15 +423,22 @@ export default function App() {
     }
   };
 
-  const handleSettingsSave = (name: string, logo: string | null) => {
+  const handleSettingsSave = (name: string, logo: string | null, codec: string, bitrate: string) => {
     setCompanyName(name);
     setCompanyLogo(logo);
+    setAudioCodec(codec);
+    setAudioBitrate(bitrate);
+
     localStorage.setItem('companyName', name);
     if (logo) {
       localStorage.setItem('companyLogo', logo);
     } else {
       localStorage.removeItem('companyLogo');
     }
+    
+    localStorage.setItem('audioCodec', codec);
+    localStorage.setItem('audioBitrate', bitrate);
+
     setLastLog("System Configuration Updated");
   };
 
@@ -705,6 +716,8 @@ export default function App() {
         onClose={() => setIsSettingsOpen(false)}
         currentName={companyName}
         currentLogo={companyLogo}
+        currentCodec={audioCodec}
+        currentBitrate={audioBitrate}
         onSave={handleSettingsSave}
         installPrompt={installPrompt}
         onInstall={handleInstallApp}

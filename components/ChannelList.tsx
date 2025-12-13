@@ -1,6 +1,6 @@
 import React from 'react';
 import { Channel, ChannelType, User, Department, Account } from '../types';
-import { Lock, Radio, Bot, Users as UsersIcon, Mic, Plus, Building2, ChevronDown, Signal, SignalZero, UserCog, LogOut, Shield } from 'lucide-react';
+import { Lock, Radio, Bot, Users as UsersIcon, Mic, Plus, Building2, ChevronDown, Signal, SignalZero, UserCog, Power, Shield } from 'lucide-react';
 
 interface ChannelListProps {
   companyName: string;
@@ -80,9 +80,6 @@ const ChannelList: React.FC<ChannelListProps> = ({
           <Radio size={14} /> Freq
         </button>
         
-        {/* Admin Button replaces 'Users' for Admin, or sits alongside? 
-            Let's keep generic 'Users' button but it triggers Admin Console if admin 
-        */}
         <button 
           onClick={onManageUsers}
           className={`flex-1 flex flex-col items-center justify-center gap-1 text-[9px] font-bold uppercase py-2 rounded transition-all border ${isAdmin ? 'bg-red-900/20 hover:bg-red-800 text-red-400 hover:text-white border-red-900/50' : 'bg-ptt-accent/10 hover:bg-ptt-accent text-ptt-accent hover:text-white border-ptt-accent/30 hover:border-ptt-accent'}`}
@@ -201,7 +198,7 @@ const ChannelList: React.FC<ChannelListProps> = ({
         <div className="flex items-center justify-between bg-gray-800/30 p-2 rounded-lg border border-gray-700/30">
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="w-8 h-8 rounded bg-ptt-accent/20 border border-ptt-accent/50 flex items-center justify-center text-xs font-bold text-ptt-accent shadow-lg shrink-0">
-              {currentUser.callsign.substring(0, 2)}
+              {currentUser.callsign.substring(0, 2).toUpperCase()}
             </div>
             <div className="overflow-hidden">
               <div className="text-sm font-bold text-white truncate font-mono">{currentUser.callsign}</div>
@@ -214,9 +211,9 @@ const ChannelList: React.FC<ChannelListProps> = ({
           <button 
             onClick={onLogout} 
             className="text-gray-500 hover:text-red-400 transition-colors p-1" 
-            title="Log Out"
+            title="Disconnect"
           >
-            <LogOut size={16} />
+            <Power size={16} />
           </button>
         </div>
       </div>

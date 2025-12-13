@@ -1,10 +1,10 @@
 # Building Native Clients for SecurePTT
 
-This guide explains how to build the Android APK and Windows EXE files and host them on your server so users can download them from the App Settings.
+This guide explains how to build the Android APK and Windows EXE files and host them on your server so users can download them directly from the App Settings menu.
 
 ## 1. Prerequisites
 
-*   **Node.js**: Installed.
+*   **Node.js**: Installed (for the server).
 *   **Flutter SDK**: Installed (for Android build).
 *   **Android Studio**: Setup with SDK (for Android build).
 
@@ -14,22 +14,33 @@ This guide explains how to build the Android APK and Windows EXE files and host 
 
 We use the Flutter wrapper located in the `mobile/` directory.
 
-1.  **Configure URL**:
-    Open `mobile/lib/main.dart` and ensure `_appUrl` points to your deployed server (e.g., `https://your-domain.com`).
+### Step A: Configure URL
+1.  Open `mobile/lib/main.dart`.
+2.  Locate the `_appUrl` variable.
+3.  Change it to your **deployed HTTPS server URL** (e.g., `https://your-app.com`).
+    *   *Note: If testing locally on Android Emulator, keep it as `http://10.0.2.2:3000`.*
 
-2.  **Build**:
-    Open a terminal in the `mobile/` directory:
+### Step B: Setup Permissions (One Time)
+Ensure `mobile/android/app/src/main/AndroidManifest.xml` includes these permissions before the `<application>` tag:
+```xml
+<uses-permission android:name="android.permission.INTERNET"/>
+<uses-permission android:name="android.permission.RECORD_AUDIO" />
+<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+```
+
+### Step C: Build the APK
+1.  Open a terminal in the `mobile/` directory.
+2.  Run the build command:
     ```bash
-    cd mobile
     flutter build apk --release
     ```
 
-3.  **Locate File**:
-    The built APK will be at: `mobile/build/app/outputs/flutter-apk/app-release.apk`
-
-4.  **Deploy**:
-    Create a `downloads` folder in your project root (same level as `server.js`).
-    Copy `app-release.apk` to `downloads/` and rename it to `secure-ptt.apk`.
+### Step D: Host the File
+1.  The build process creates the file at:
+    `mobile/build/app/outputs/flutter-apk/app-release.apk`
+2.  Create a folder named `downloads` in your project's root directory (next to `server.js`).
+3.  Copy `app-release.apk` into that folder.
+4.  **Rename** it to `secure-ptt.apk`.
 
 ---
 
@@ -37,33 +48,28 @@ We use the Flutter wrapper located in the `mobile/` directory.
 
 We use the Electron wrapper located in the `electron/` directory.
 
-1.  **Configure URL**:
-    Open `electron/main.cjs` and set `APP_URL` to your deployed server URL.
+### Step A: Configure URL
+1.  Open `electron/main.cjs`.
+2.  Set `APP_URL` to your deployed server URL.
 
-2.  **Install Dependencies**:
-    Open a terminal in the `electron/` directory:
+### Step B: Build
+1.  Open a terminal in the `electron/` directory.
+2.  Run:
     ```bash
-    cd electron
     npm install
-    ```
-
-3.  **Build**:
-    Run the build script:
-    ```bash
     npm run dist
     ```
 
-4.  **Locate File**:
-    The installer EXE will be in the `electron/dist/` folder (e.g., `SecurePTT Setup 1.0.0.exe`).
-
-5.  **Deploy**:
-    Copy the `.exe` file to your root `downloads/` folder and rename it to `secure-ptt-setup.exe`.
+### Step C: Host the File
+1.  The installer EXE will be in `electron/dist/` (e.g., `SecurePTT Setup 1.0.0.exe`).
+2.  Copy it to the root `downloads/` folder.
+3.  **Rename** it to `secure-ptt-setup.exe`.
 
 ---
 
 ## 4. Final Verification
 
-1.  Ensure your server directory looks like this:
+1.  Your server directory should look like this:
     ```
     /project-root
       /downloads
@@ -74,6 +80,11 @@ We use the Electron wrapper located in the `electron/` directory.
       ...
     ```
 
-2.  Restart your server (`npm start`).
-3.  Open the App -> Settings -> "Native Client Downloads".
-4.  Click the buttons to verify downloads work.
+2.  Restart your server:
+    ```bash
+    npm start
+    ```
+
+3.  Open the App in your browser.
+4.  Go to **Settings** -> **Native Client Downloads**.
+5.  Click the Android or Windows button. The file should download immediately.
