@@ -247,10 +247,13 @@ app.delete('/api/users/:id', (req, res) => {
 // Serve static files from the build directory (Dist)
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Handle SPA routing: return index.html for any unknown route NOT starting with /api
+// Serve Downloads directory for native builds
+app.use('/downloads', express.static(path.join(__dirname, 'downloads')));
+
+// Handle SPA routing: return index.html for any unknown route NOT starting with /api or /downloads
 app.get('*', (req, res) => {
-  if (req.url.startsWith('/api')) {
-    return res.status(404).json({ error: 'API route not found' });
+  if (req.url.startsWith('/api') || req.url.startsWith('/downloads')) {
+    return res.status(404).json({ error: 'Not found' });
   }
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
@@ -258,5 +261,6 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`\n🚀 SecurePTT Backend & Host running on http://localhost:${PORT}`);
   console.log(`   - API Endpoint: http://localhost:${PORT}/api/init`);
-  console.log(`   - Serving: /dist folder`);
+  console.log(`   - Downloads:    http://localhost:${PORT}/downloads`);
+  console.log(`   - Serving:      /dist folder`);
 });

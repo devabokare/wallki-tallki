@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Settings, Upload, Save, Image as ImageIcon, Trash2, Download } from 'lucide-react';
+import { X, Settings, Upload, Save, Image as ImageIcon, Trash2, Download, Smartphone, Monitor } from 'lucide-react';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -67,23 +67,48 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
         <div className="max-h-[80vh] overflow-y-auto p-6 space-y-6">
           
-          {/* Install Application Section - Only shows if supported */}
+          {/* PWA Install */}
           {installPrompt && (
-            <div className="bg-gradient-to-r from-blue-900/20 to-transparent border border-blue-900/50 rounded p-4 mb-4">
+            <div className="bg-gradient-to-r from-blue-900/20 to-transparent border border-blue-900/50 rounded p-4 mb-2">
               <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                <Download size={14} /> Desktop / Mobile App
+                <Download size={14} /> Web Application
               </h4>
               <p className="text-gray-400 text-xs mb-3">
-                Install this frequency terminal as a native application for better performance and easier access.
+                Install as a PWA for quick access.
               </p>
               <button
                 onClick={onInstall}
                 className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider rounded transition-colors shadow-lg"
               >
-                Install to Device
+                Add to Home Screen
               </button>
             </div>
           )}
+
+          {/* Native Downloads */}
+          <div className="bg-gray-900/50 border border-gray-700 rounded p-4">
+            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <Download size={14} /> Native Client Downloads
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              <a 
+                href="/downloads/secure-ptt.apk" 
+                download
+                className="flex flex-col items-center justify-center gap-2 p-3 bg-gray-800 hover:bg-gray-700 border border-gray-600 hover:border-ptt-accent rounded transition-all text-center group"
+              >
+                <Smartphone size={20} className="text-gray-400 group-hover:text-green-400" />
+                <span className="text-[10px] font-bold text-gray-300 group-hover:text-white">ANDROID (.APK)</span>
+              </a>
+              <a 
+                href="/downloads/secure-ptt-setup.exe" 
+                download
+                className="flex flex-col items-center justify-center gap-2 p-3 bg-gray-800 hover:bg-gray-700 border border-gray-600 hover:border-ptt-accent rounded transition-all text-center group"
+              >
+                <Monitor size={20} className="text-gray-400 group-hover:text-blue-400" />
+                <span className="text-[10px] font-bold text-gray-300 group-hover:text-white">WINDOWS (.EXE)</span>
+              </a>
+            </div>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             

@@ -1,0 +1,24 @@
+{
+  "name": "secure-ptt-desktop",
+  "version": "1.0.0",
+  "description": "SecurePTT Desktop Client",
+  "main": "main.cjs",
+  "author": "Adroit Group",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^29.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.adroit.secureptt",
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico"
+    }
+  }
+}
